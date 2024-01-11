@@ -1,0 +1,462 @@
+#Microsoft Paint Mini 
+########################################################
+
+# Declare Initial Values
+.eqv BG_COLOR, 0xFF	 # white (7/7 red, 7/7 green, 3/3 blue)
+.eqv VG_ADDR, 0x11000120
+.eqv VG_COLOR, 0x11000140
+.eqv CURSOR_COLOR, 0x49
+
+INIT: 
+    	li sp, 0x10000     #initialize stack pointer
+    	li s0, 0x11000000
+	li s2, VG_ADDR     #load MMIO addresses 
+	li s3, VG_COLOR  
+	li a4, BG_COLOR
+	li s6, 0
+	call draw_background 
+	
+	#Load Cursor In Center Of The Screen
+	li a0, 40 
+	li a1, 30
+	li a3, CURSOR_COLOR #gray color code
+	call draw_dot
+
+STATE:
+	#Reads switch values
+	lw t0, 0(s0)
+	andi t1, t0, 1
+	bnez t1, DRAW
+
+
+CURSOR: 
+	lw t0 ,0x200(s0)       #4th Bit = up // 3rd Bit = down // 2nd Bit = left // 1st Bit = right
+	li t1, 1
+	beq t0, t1, CURSOR_RIGHT
+	li t1, 2
+	beq t0, t1, CURSOR_LEFT
+	li t1, 4
+	beq t0, t1, CURSOR_DOWN
+	li t1, 8
+	beq t0, t1, CURSOR_UP
+	j STATE
+	
+CURSOR_RIGHT:
+	li t0, 79
+	beq a0, t0, STATE
+	addi a3, a4, 0
+	call draw_dot
+	li a3, CURSOR_COLOR
+	addi a0, a0, 1
+	call read_dot
+	call draw_dot
+	call DELAY
+	j STATE
+	
+CURSOR_LEFT:
+	li t0, 1
+	beq a0, t0, STATE
+	addi a3, a4, 0
+	call draw_dot
+	li a3, CURSOR_COLOR
+	addi a0, a0, -1
+	call read_dot
+	call draw_dot
+	call DELAY
+	j STATE
+	
+CURSOR_DOWN:
+	li t0, 1
+	beq a1, t0, STATE
+	addi a3, a4, 0
+	call draw_dot
+	li a3, CURSOR_COLOR
+	addi a1, a1, -1
+	call read_dot
+	call draw_dot
+	call DELAY
+	j STATE
+	
+CURSOR_UP:
+	li t0, 59
+	beq a1, t0, STATE
+	addi a3, a4, 0
+	call draw_dot
+	li a3, CURSOR_COLOR
+	addi a1, a1, 1
+	call read_dot
+	call draw_dot
+	call DELAY
+	j STATE
+	
+	
+DRAW:
+	addi s6, a3, 0
+	call select_color
+	li a5, 1
+	lw t0, 0(s0)
+	srli t1, t0, 14
+	bnez t1, CIRCLE
+	li t0, 0
+	sw t0, 0x40(s0)
+	beq s6, a3, NO_LINE
+	add t5, x0, a0
+	add t6, x0, a1
+	li a0, 0
+	li a1, 0
+	li a2, 80
+	call draw_horizontal_line
+	li a0, 0
+	li a1, 0
+	add a0, x0, t5
+	add a1, x0, t6
+NO_LINE:	
+	lw t0 ,0x200(s0)       #4th Bit = up // 3rd Bit = down // 2nd Bit = left // 1st Bit = right
+	li t1, 1
+	beq t0, t1, DRAW_RIGHT
+	li t1, 2
+	beq t0, t1, DRAW_LEFT
+	li t1, 4
+	beq t0, t1, DRAW_DOWN
+	li t1, 8
+	beq t0, t1, DRAW_UP
+	j STATE
+	
+DRAW_RIGHT:	
+	li t0, 79
+	beq a0, t0, STATE
+	call draw_dot
+	li a3, CURSOR_COLOR
+	addi a0, a0, 1
+	call draw_dot
+	call DELAY
+	j STATE
+	
+DRAW_LEFT:
+	li t0, 1
+	beq a0, t0, STATE
+	call draw_dot
+	li a3, CURSOR_COLOR
+	addi a0, a0, -1
+	call draw_dot
+	call DELAY
+	j STATE
+	
+DRAW_DOWN:
+	li t0, 1
+	beq a1, t0, STATE
+	call draw_dot
+	li a3, CURSOR_COLOR
+	addi a1, a1, -1
+	call draw_dot
+	call DELAY
+	j STATE
+	
+DRAW_UP:
+	li t0, 59
+	beq a1, t0, STATE
+	call draw_dot
+	li a3, CURSOR_COLOR
+	addi a1, a1, 1
+	call draw_dot
+	call DELAY
+	j STATE
+	
+	
+CIRCLE:
+	sw a5, 0x40(s0)
+LOOP_CIR:
+	lw t0, 0(s0)
+	srli t1, t0, 14
+	beqz t1, PLACE_CIRCLE
+	li t0, 3
+	beq a5, t0, LOOP_CIR
+	lw t0, 0x200(s0)
+	li t1, 8
+	bne t0, t1, CIRCLE
+	addi a5, a5, 1
+	sw a5, 0x40(s0)
+	call DELAY
+	call DELAY
+	j CIRCLE
+	
+PLACE_CIRCLE:
+	li t0, 1
+	li t1, 2
+	li t2, 3
+	beq a5, t0, RADIUS_1
+	beq a5, t1, RADIUS_2
+	beq a5, t2, RADIUS_3
+	j STATE
+	
+RADIUS_1:
+	addi t5, a0, 0
+	addi t6, a1, 0
+	addi a0, a0, 2
+	call draw_dot
+	addi a1, a1, 1
+	call draw_dot
+	addi a0, a0, -1
+	call draw_dot
+	addi a1, a1, 1
+	call draw_dot
+	addi a0, a0, -1
+	call draw_dot
+	addi a0, a0, -1
+	call draw_dot
+	addi a1, a1, -1
+	call draw_dot
+	addi a0, a0, -1
+	call draw_dot
+	addi a1, a1, -1
+	call draw_dot
+	addi a1, a1, -1
+	call draw_dot
+	addi a0, a0, 1
+	call draw_dot
+	addi a1, a1, -1
+	call draw_dot
+	addi a0, a0, 1
+	call draw_dot
+	addi a0, a0, 1
+	call draw_dot
+	addi a1, a1, 1
+	call draw_dot
+	addi a0, a0, 1
+	call draw_dot
+	addi a0, t5, 0
+	addi a1, t6, 0
+	j STATE
+	
+RADIUS_2:
+	addi t5, a0, 0
+	addi t6, a1, 0
+	addi a0, a0, 3
+	call draw_dot
+	addi a1, a1, 1
+	call draw_dot
+	addi a0, a0, -1
+	call draw_dot
+	addi a1, a1, 1
+	call draw_dot
+	addi a0, a0, -1
+	call draw_dot
+	addi a1, a1, 1
+	call draw_dot
+	addi a0, a0, -1
+	call draw_dot
+	addi a0, a0, -1
+	call draw_dot
+	addi a1, a1, -1
+	call draw_dot
+	addi a0, a0, -1
+	call draw_dot
+	addi a1, a1, -1
+	call draw_dot
+	addi a0, a0, -1
+	call draw_dot
+	addi a1, a1, -1
+	call draw_dot
+	addi a1, a1, -1
+	call draw_dot
+	addi a0, a0, 1
+	call draw_dot
+	addi a1, a1, -1
+	call draw_dot
+	addi a0, a0, 1
+	call draw_dot
+	addi a1, a1, -1
+	call draw_dot
+	addi a0, a0, 1
+	call draw_dot
+	addi a0, a0, 1
+	call draw_dot
+	addi a1, a1, 1
+	call draw_dot
+	addi a0, a0, 1
+	call draw_dot
+	addi a1, a1, 1
+	call draw_dot
+	addi a0, a0, 1
+	call draw_dot
+	addi a0, t5, 0
+	addi a1, t6, 0
+	j STATE
+	
+RADIUS_3: 
+	addi t5, a0, 0
+	addi t6, a1, 0
+	addi a0, a0, 4
+	call draw_dot
+	addi a1, a1, 1
+	call draw_dot
+	addi a1, a1, 1
+	call draw_dot
+	addi a0, a0, -1
+	call draw_dot
+	addi a1, a1, 1
+	call draw_dot
+	addi a0, a0, -1
+	call draw_dot
+	addi a1, a1, 1
+	call draw_dot
+	addi a0, a0, -1
+	call draw_dot
+	addi a0, a0, -1
+	call draw_dot
+	addi a0, a0, -1
+	call draw_dot
+	addi a0, a0, -1
+	call draw_dot
+	addi a1, a1, -1
+	call draw_dot
+	addi a0, a0, -1
+	call draw_dot
+	addi a1, a1, -1
+	call draw_dot
+	addi a0, a0, -1
+	call draw_dot
+	addi a1, a1, -1
+	call draw_dot
+	addi a1, a1, -1
+	call draw_dot
+	addi a1, a1, -1
+	call draw_dot
+	addi a1, a1, -1
+	call draw_dot
+	addi a0, a0, 1
+	call draw_dot
+	addi a1, a1, -1
+	call draw_dot
+	addi a0, a0, 1
+	call draw_dot
+	addi a1, a1, -1
+	call draw_dot
+	addi a0, a0, 1
+	call draw_dot
+	addi a0, a0, 1
+	call draw_dot
+	addi a0, a0, 1
+	call draw_dot
+	addi a0, a0, 1
+	call draw_dot
+	addi a1, a1, 1
+	call draw_dot
+	addi a0, a0, 1
+	call draw_dot
+	addi a1, a1, 1
+	call draw_dot
+	addi a0, a0, 1
+	call draw_dot
+	addi a1, a1, 1
+	call draw_dot
+	addi a0, t5, 0
+	addi a1, t6, 0
+	j STATE
+	
+	
+DELAY:					# half second delay
+	li   t0, 0			# counter for num of instructions executed
+	li   t1, 3125000		# need 12500000 instructions but 2 li s count
+	DELAY_LOOP:		
+	beq t0, t1 END_DELAY		# check counter equals num of instructs. needed
+	addi t0, t0, 2			# 2 instructions in loop, increment by 2
+	j DELAY_LOOP	
+END_DELAY:	
+	ret
+
+
+# Fills the 60x80 grid with one color using successive calls to draw_horizontal_line
+# Modifies (directly or indirectly): t0, t1, t4, a0, a1, a2, a3
+draw_background:
+	addi sp,sp,-4
+	sw ra, 0(sp)
+	li a3, BG_COLOR	#use default color
+	li a1, 0	#a1= row_counter
+	li t4, 60 	#max rows
+start:	li a0, 0
+	li a2, 79 	#total number of columns
+	call draw_horizontal_line  # must not modify: t4, a1, a3
+	addi a1,a1, 1
+	bne t4,a1, start	#branch to draw more rows
+	lw ra, 0(sp)
+	addi sp,sp,4
+	ret
+
+# draws a horizontal line from (a0,a1) to (a2,a1) using color in a3
+# Modifies (directly or indirectly): t0, t1, a0, a2
+draw_horizontal_line:
+	addi sp,sp,-4
+	sw ra, 0(sp)
+	addi a2,a2,1	#go from a0 to a2 inclusive
+draw_horiz1:
+	call draw_dot  # must not modify: a0, a1, a2, a3
+	addi a0,a0,1
+	bne a0,a2, draw_horiz1
+	lw ra, 0(sp)
+	addi sp,sp,4
+	ret
+
+# draws a dot on the display at the given coordinates:
+# 	(X,Y) = (a0,a1) with a color stored in a3
+# 	(col, row) = (a0,a1)
+# Modifies (directly or indirectly): t0, t1
+draw_dot:
+	andi t0,a0,0x7F	# select bottom 7 bits (col)
+	andi t1,a1,0x3F	# select bottom 6 bits  (row)
+	slli t1,t1,7	#  {a1[5:0],a0[6:0]} 
+	or t0,t1,t0	# 13-bit address
+	sw t0, 0(s2)	# write 13 address bits to register
+	sw a3, 0(s3)	# write color data to frame buffer
+	ret
+	
+read_dot:
+	andi t0,a0,0x7F	# select bottom 7 bits (col)
+	andi t1,a1,0x3F	# select bottom 6 bits  (row)
+	slli t1,t1,7	#  {a1[5:0],a0[6:0]} 
+	or t0,t1,t0	# 13-bit address
+	sw t0, 0(s2)	# write 13 address bits to register
+	lw a4, 0x20(s3)	# write color data to frame buffer
+	ret
+	
+# selects colors
+select_color:
+	lw t0, 0(s0)
+	andi t1, t0, 2
+	andi t2, t0, 4
+	andi t3, t0, 8
+	andi t4, t0, 16
+	andi t5, t0, 32
+	andi t6, t0, 64
+	bnez t1, RED
+	bnez t2, GREEN
+	bnez t3, BLUE
+	bnez t4, YELLOW
+	bnez t5, BLACK
+	bnez t6, RAINBOW
+	li a3, 0xFF
+	ret
+	
+RED:
+	li a3, 0xE0
+	ret
+
+GREEN:
+	li a3, 0x1D
+	ret
+
+BLUE:
+	li a3, 0x3
+	ret
+	
+YELLOW:
+	li a3, 0xFC
+	ret
+	
+BLACK:
+	li a3, 0
+	ret
+	
+RAINBOW:
+	addi a3, a3, 10
+	ret
